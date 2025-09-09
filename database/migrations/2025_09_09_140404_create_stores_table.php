@@ -17,7 +17,6 @@ return new class extends Migration
             // Foreign key to link the store to its owner
             $table->foreignId('user_id')->constrained('users', 'userID')->onDelete('cascade');
             $table->string('officialName');  // Official registered name of the store
-            $table->string('displayName');  // Name displayed to consumers
             $table->string('address');   // Physical address of the store
             $table->string('contactEmail')->unique(); // Contact email for the store
             $table->string('contactPhone')->unique(); // Contact phone number for the store
