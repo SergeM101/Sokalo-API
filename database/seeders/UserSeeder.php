@@ -17,5 +17,12 @@ class UserSeeder extends Seeder
         User::factory(5)->create([
             'role' => UserRole::STORE_OWNER,
         ]);
+
+        // Create one Admin user
+        User::factory()->create([
+            'userName' => 'Admin User',
+            'email' => 'admin@sokalo.com',
+            'role' => UserRole::ADMIN,
+        ]);
     }
 }

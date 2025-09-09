@@ -19,8 +19,8 @@ class Store extends Model
         'address',     // Store address
         'category',     // Enum field
         'verificationStatus',   // Enum field
-        'contact-Email',
-        'contact-Phone', // Contact information
+        'contactEmail',
+        'contactPhone', // Contact information
         'images'
     ];
 
@@ -58,5 +58,13 @@ class Store extends Model
     public function followers()
     {
         return $this->belongsToMany(User::class, 'consumer_store_follow', 'store_id', 'user_id');
+    }
+
+    /**
+     * A store can have many promotions.
+     */
+    public function promotions()
+    {
+        return $this->hasMany(Promotion::class, 'store_id', 'storeID');
     }
 };

@@ -16,13 +16,14 @@ return new class extends Migration
             $table->id('itemID');
             // Foreign key to link the item to its store
             $table->foreignId('store_id')->constrained('stores', 'storeID')->onDelete('cascade');
-            $table->string('barcode')->unique(); // Unique barcode for the item
+            $table->string('barcode'); // barcode for the item
             $table->string('itemName'); // Name of the item
             $table->string('itemType'); // Type or category of the item
             $table->float('sellingPrice'); // Selling price of the item
             $table->enum('stockAvailability', ['in_stock', 'low_stock', 'out_of_stock']); // Stock status
             $table->json('images')->nullable(); // JSON array to store paths/URLs of item images ADDED
             $table->timestamps(); // Corresponds to dateAdded
+            $table->unique(['barcode', 'store_id']); // Ensure unique barcode per store
         });
     }
 
