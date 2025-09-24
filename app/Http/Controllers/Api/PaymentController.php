@@ -4,13 +4,23 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Payment;
+use App\Enums\PaymentStatus;
+use App\Services\Payment\CampayService;
+use App\Enums\PaymentMethod;
 use App\Models\Subscription;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 
-class PaymentController extends Controller
-{
+class PaymentController extends Controller {
+
+    protected $campayService;
+
+    public function __construct(CampayService $campayService)
+    {
+        $this->campayService = $campayService;
+    }
+
     /**
      * Step 1: User initiates the payment from the frontend.
      */
@@ -80,5 +90,48 @@ class PaymentController extends Controller
         // }
 
         return response()->json(['status' => 'success']);
+    }
+
+    public function initiateMobilePayment(Request $request){
+        $validated = $request->validate([
+            'amount' => 'required|numeric',
+            'phone_number' => 'required|string',
+            'description' => 'nullable|string',
+            'payment_method' => 'required|string|in:' . PaymentMethod::CAMPAY->value
+        ]);
+
+        try {
+            $response = $this->campayService->initiatePayment(
+                $validated['amount'],
+                $validated['phone_number'],
+                $validated['description'] ?? null
+            );
+
+            // Create payment record
+            $payment = Payment::create([
+                'amount' => $validated['amount'],
+                'reference' => $response['reference'],
+                'status' => PaymentStatus::PENDING->value,
+                'payment_method' => PaymentMethod::CAMPAY->value,
+                'user_id' => $request->user()->userID,
+                'metadata' => [
+                    'phone_number' => $validated['phone_number'],
+                    'campay_reference' => $response['reference'],
+                ]
+            ]);
+
+            return response()->json([
+                'message' => 'Payment initiated successfully',
+                'data' => [
+                    'payment' => $payment,
+                    'campay_response' => $response
+                ]
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Payment initiation failed',
+                'error' => $e->getMessage()
+            ], 400);
+        }
     }
 }
