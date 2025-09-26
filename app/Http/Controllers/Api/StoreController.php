@@ -102,19 +102,4 @@ class StoreController extends Controller
         // Using Route Model Binding, Laravel automatically finds the store for us.
         return response()->json($store);
     }
-
-    /**
-     * Get the store associated with the authenticated user. Store owner dashboard feature.
-     */
-    public function getUserStore(Request $request)
-    {
-        // Get the store associated with the authenticated user
-        $store = $request->user()->store;
-
-        if (!$store) {
-            return response()->json(['message' => 'Store not found for this user.'], 404);
-        }
-
-        return response()->json($store);
-    }
 }

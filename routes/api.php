@@ -29,7 +29,6 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::middleware('auth:sanctum')->group(function () {
         Route::post('/stores', [StoreController::class, 'store']);
         Route::put('/stores/{store}', [StoreController::class, 'update']); // <-- ADD/CONFIRM THIS
-        Route::get('/user/store', [StoreController::class, 'getUserStore']);
     });
 });
 
