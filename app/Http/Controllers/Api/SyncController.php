@@ -1,63 +1,62 @@
 <?php
+// in app/Http/Controllers/Api/SyncController.php
 
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Item;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Crypt; // <-- 1. Import the Crypt facade
-use Illuminate\Support\Facades\Log;     // <-- For logging errors
-use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\ValidationException;
 
 class SyncController extends Controller
 {
+    /**
+     * Receives item data from the local desktop application and updates the central database.
+     */
     public function syncItems(Request $request)
     {
-        $user = $request->user();
+        $user = Auth::user();
+        $storeId = $user->store_id;
 
-        // 2. Expect a single 'payload' field with the encrypted data
-        $payload = $request->input('payload');
-        if (!$payload) {
-            return response()->json(['message' => 'Encrypted payload is missing.'], 422);
+        if (!$storeId) {
+            return response()->json(['message' => 'User is not associated with a store.'], 403);
         }
 
         try {
-            // 3. Decrypt the payload to get the original item array
-            $decryptedData = Crypt::decrypt($payload);
-        } catch (\Illuminate\Contracts\Encryption\DecryptException $e) {
-            // Log the error for debugging, but return a generic error to the user
-            Log::error('Decryption failed for store: ' . $user->store->storeID);
-            return response()->json(['message' => 'Invalid encrypted data.'], 422);
+            // Directly validate the array of items from the request body
+            $validatedData = $request->validate([
+                '*.itemName' => 'required|string|max:255',
+                '*.barcode' => 'required|string|max:255',
+                '*.sellingPrice' => 'required|numeric',
+                '*.stockQuantity' => 'required|integer',
+                '*.expiryDate' => 'required|date',
+            ]);
+
+            // Prepare data for upsert by adding the store_id to each item
+            $itemsToUpsert = array_map(function ($item) use ($storeId) {
+                return [
+                    'store_id' => $storeId,
+                    'item_name' => $item['itemName'],
+                    'barcode' => $item['barcode'],
+                    'selling_price' => $item['sellingPrice'],
+                    'stock_quantity' => $item['stockQuantity'],
+                    'expiry_date' => $item['expiryDate'],
+                ];
+            }, $validatedData);
+
+            // Use upsert for efficient database operations
+            Item::upsert(
+                $itemsToUpsert,
+                ['store_id', 'barcode'], // Unique keys to identify existing records
+                ['item_name', 'selling_price', 'stock_quantity', 'expiry_date'] // Columns to update
+            );
+
+            return response()->json(['message' => 'Sync successful'], 200);
+        } catch (ValidationException $e) {
+            return response()->json(['message' => 'Invalid data provided', 'errors' => $e->errors()], 422);
+        } catch (\Exception $e) {
+            return response()->json(['message' => 'An unexpected error occurred during sync.', 'error' => $e->getMessage()], 500);
         }
-
-        // 4. Validate the DECRYPTED data
-        $validator = Validator::make($decryptedData, [
-            'items' => 'required|array',
-            'items.*.barcode' => 'required|string',
-            'items.*.itemName' => 'required|string',
-            // ... (rest of your validation rules)
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json($validator->errors(), 422);
-        }
-        
-        // --- The rest of your logic remains the same ---
-        $itemsToSync = $decryptedData['items'];
-        $storeId = $user->store->storeID;
-
-        foreach ($itemsToSync as &$item) {
-            $item['store_id'] = $storeId;
-            $item['created_at'] = now();
-            $item['updated_at'] = now();
-        }
-
-        Item::upsert(
-            $itemsToSync,
-            ['barcode', 'store_id'],
-            ['itemName', 'itemType', 'sellingPrice', 'stockAvailability']
-        );
-
-        return response()->json(['message' => 'Synchronization successful.']);
     }
 }
